@@ -3,11 +3,14 @@ const app = express();
 
 app.use(express.json());
 
-
-app.get('/', (req, res) => {
-    res.send('Hello')
-  })
-
 app.listen(3001, () =>{
     console.log("Server working");
-  })
+})
+
+app.post('/signup', (req, res) => {
+    res.send('Signup')
+})
+
+app.post('/login', (req, res) => {
+    res.send('Login')
+})
