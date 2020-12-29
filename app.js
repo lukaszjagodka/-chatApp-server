@@ -1,5 +1,11 @@
 const express = require('express');
 const app = express();
+const bcrypt = require('bcrypt');
+const crypto = require('crypto');
+var Sequelize = require('sequelize');
+const Op = Sequelize.Op;
+
+const User = require('./database/models').user;
 
 app.use(express.json());
 
@@ -48,5 +54,45 @@ app.post('/signup', (req, res) => {
 })
 
 app.post('/login', (req, res) => {
-    res.send('Login')
+    User.findOne({where: { email: req.body.email}})
+    .then(user =>{
+        if(user == null){
+            return res.sendStatus(404)
+        }else{ 
+            bcrypt.compare(req.body.password, user.dataValues.password, (err, result) => {
+                if(err){
+                    console.log(err)
+                }
+                if(result){
+                    console.log('zalogowany:', user.dataValues.email)
+                    var claims = {
+                        iss: 'http://chatapp.com/',
+                        email: req.body.email,
+                        name: user.dataValues.name
+                    }
+                    const jwtToken = jwt.sign(claims,  keys.access_token_secret.tokenKey.toString());
+                    try {
+                        User.update({
+                          authToken: jwtToken,
+                        }, {
+                            where: { email: user.email }
+                        });
+                        return res.json({
+                            success: true,
+                            code: 200,
+                            jwtToken
+                        })
+                    } catch (err) {
+                        return res.json({
+                            success: false,
+                            code: 404,
+                            message:'Failed'
+                        })
+                    }
+                }else{
+                    return res.sendStatus(404)
+                }
+            })
+        }
+    })
 })
