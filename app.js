@@ -99,3 +99,33 @@ app.post('/login', (req, res) => {
         }
     })
 })
+
+app.get('/signup/:token', (req, res) => {
+    User.findOne({
+      where: {
+        token: req.params.token,
+      },
+    }).then((user) => {
+      if (!user) {
+        res.json({
+          success: false,
+          message: 'Invalid token.',
+        });
+      }
+      if (user.dataValues.active) {
+        res.json({
+          success: false,
+          message: 'Account is already active.',
+        });
+      }
+      User.update({
+        active: true,
+      }, {
+        where: { id: user.dataValues.id },
+      }).then(() => res.json({
+        success: true,
+        code: 200,
+        message: 'Your account is active now. Please log in.',
+      })).catch((err) => console.log(err));
+    }).catch((err) => console.log(err));
+})
