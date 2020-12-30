@@ -4,11 +4,12 @@ const bcrypt = require('bcrypt');
 const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const keys = require('./config/keys');
-var Sequelize = require('sequelize');
-
-const Op = Sequelize.Op;
+const registerMail = require('./utils/register_mail');
+const remindPass = require('./utils/remind_pass');
 
 const User = require('./database/models').user;
+var Sequelize = require('sequelize');
+const Op = Sequelize.Op;
 
 app.use(express.json());
 
@@ -129,3 +130,58 @@ app.get('/signup/:token', (req, res) => {
       })).catch((err) => console.log(err));
     }).catch((err) => console.log(err));
 })
+
+app.post('/rememberpassword', (req, res) => {
+    let tempPassword = "";
+    crypto.randomBytes(5, (err, buf) => {
+      if (err) throw err;
+      return tempPassword = buf.toString('hex');
+    });
+      User.findOne({
+          where: { email: req.body.email}
+      }).then(user =>{
+          if(user){
+              if (user.dataValues.active) {
+              
+                  bcrypt.hash(tempPassword, 10, async (err, hash) => {
+                    if(err){
+                      console.log(err)
+                    }else{
+                      try{
+                        User.update({
+                            password: hash,
+                        },{
+                            where: { email: user.dataValues.email },
+                        }).then(() => 
+                            res.json({
+                                success: true,
+                                code: 200,
+                                message: 'Your account is active now. Please log in.',
+                            })
+                        )
+                        remindPass(user.dataValues.email,tempPassword)
+                    }catch (err) {
+                        return res.json({
+                            success: false,
+                            code: 404, //
+                            message:'Failed'
+                        })
+                    }
+                    }
+                      console.log(tempPassword)
+                  })
+              }else{
+                  return res.json({
+                      success: false,
+                      message: 'Account is not active. Check your email.',
+                  });
+              }
+          }else{
+              return res.json({
+                  success: false,
+                  code: 404,
+                  message:'Failed'
+              })
+          }
+      }).catch((err) => console.log(err));
+  })
