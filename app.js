@@ -2,7 +2,10 @@ const express = require('express');
 const app = express();
 const bcrypt = require('bcrypt');
 const crypto = require('crypto');
+const jwt = require('jsonwebtoken');
+const keys = require('./config/keys');
 var Sequelize = require('sequelize');
+
 const Op = Sequelize.Op;
 
 const User = require('./database/models').user;
