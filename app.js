@@ -6,6 +6,7 @@ const jwt = require('jsonwebtoken');
 const keys = require('./config/keys');
 const registerMail = require('./utils/register_mail');
 const remindPass = require('./utils/remind_pass');
+const authenticateToken = require('./authToken/authToken');
 
 const User = require('./database/models').user;
 var Sequelize = require('sequelize');
@@ -185,3 +186,51 @@ app.post('/rememberpassword', (req, res) => {
           }
       }).catch((err) => console.log(err));
   })
+
+app.post('/passwordchange', authenticateToken, (req, res) => {
+    console.log(req)
+    console.log(JSON.stringify(req.body, null, 2));
+    const actualPassword = req.body.actualPass
+    const newPassword = req.body.newPassword
+    User.findOne({
+        where: {
+        email: req.user.email
+        }
+    }).then(user => {
+        bcrypt.compare(actualPassword, user.password, (err, result) => {
+        if (err) {
+            return res.json({
+            success: false,
+            code: 400,
+            message: 'Actual password is wrong.'
+            })
+        } else {
+            bcrypt.hash(newPassword, 10, (err, hash) => {
+            if (err) {
+                return res.json({
+                success: false,
+                code: 400,
+                message: 'Problem with new password.'
+                })
+            } else {
+                try {
+                User.update({
+                    password: hash
+                }, {
+                    where: { email: user.email }
+                    }).then(() => {
+                    return res.json({
+                        success: true,
+                        code: 200,
+                        message: 'New password confirmed.'
+                    })
+                    })
+                } catch (error) {
+                console.log(error)
+                }
+            }
+            });
+        }
+        });
+    });
+})

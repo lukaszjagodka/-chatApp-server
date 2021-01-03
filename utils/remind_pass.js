@@ -14,7 +14,7 @@ module.exports = function register_mail(address, temppassword) {
     };
     
     mailgun.messages().send(data, function (error, body) {
-      console.log(body);
+      // console.log(body);
     });
 };
   
