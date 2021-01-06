@@ -1,16 +1,12 @@
 'use strict';
-const {
-  Model
-} = require('sequelize');
+const { Model } = require('sequelize');
+const conversationPermiss = require('./conversationpermiss');
 module.exports = (sequelize, DataTypes) => {
   class user extends Model {
-    /**
-     * Helper method for defining associations.
-     * This method is not a part of Sequelize lifecycle.
-     * The `models/index` file will call this method automatically.
-     */
     static associate(models) {
-      // define association here
+      user.hasMany(models.conversationPermiss, {
+        foreignKey: 'conversationUsers'
+      })
     }
   };
   user.init({
@@ -19,7 +15,8 @@ module.exports = (sequelize, DataTypes) => {
     password: DataTypes.STRING,
     authToken: DataTypes.STRING,
     token: DataTypes.STRING,
-    active: DataTypes.BOOLEAN
+    active: DataTypes.BOOLEAN,
+    conversationId: DataTypes.ARRAY(DataTypes.INTEGER)
   }, {
     sequelize,
     modelName: 'user',
