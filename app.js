@@ -302,3 +302,56 @@ app.post('/searchuser', (req, res) => {
       fnLiveSearching(req.body.name)
     }
 })
+
+app.post('/searchconversation', (req, res) => {
+  const userEmail = req.body.email;
+  const recipient = req.body.recipient;
+  User.findOne({
+    where: {
+      email: userEmail
+    }
+  }).then(userId => {
+    const user = userId.dataValues.id;
+    conversationPermiss.findOne({
+    where: {
+      conversationUsers: { [Op.contains]: [user, recipient]}
+    }
+  }).then(users => {
+    if(users){
+      const conversationName = users.dataValues.conversationName;
+        return res.json({
+          success: true,
+          code: 200,
+          conversationName
+        })
+    }else{
+      createUuid = createNewUuid();
+      if(createUuid){
+        const users = [user, recipient];
+          conversationPermiss.create({
+            conversationName: createUuid,
+            conversationUsers: users
+        },{
+            fields: ['conversationName','conversationUsers']
+        }).then(user => {
+          const conversationId = user.dataValues.id;
+          const conversationName = user.dataValues.conversationName;
+
+          User.update({
+            conversationId: Sequelize.fn('array_append', Sequelize.col('conversationId'), conversationId)
+          },{
+            where: { id: users}
+          }).then(x => {
+            return res.json({
+              success: true,
+              code: 200,
+              conversationName
+            })
+          })
+
+        }).catch(err => console.log(err))
+      }
+    }
+  })
+  })
+})
