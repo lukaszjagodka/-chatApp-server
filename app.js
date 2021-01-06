@@ -4,11 +4,13 @@ const bcrypt = require('bcrypt');
 const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const keys = require('./config/keys');
-const registerMail = require('./utils/register_mail');
-const remindPass = require('./utils/remind_pass');
+const registerMail = require('./utils/mails/register_mail');
+const remindPass = require('./utils/mails/remind_pass');
 const authenticateToken = require('./authToken/authToken');
+const createNewUuid = require('./utils/create_new_uuid');
 
 const User = require('./database/models').user;
+const conversationPermiss = require('./database/models').conversationPermiss;
 var Sequelize = require('sequelize');
 const Op = Sequelize.Op;
 
@@ -185,16 +187,14 @@ app.post('/rememberpassword', (req, res) => {
               })
           }
       }).catch((err) => console.log(err));
-  })
+})
 
 app.post('/passwordchange', authenticateToken, (req, res) => {
-    console.log(req)
-    console.log(JSON.stringify(req.body, null, 2));
     const actualPassword = req.body.actualPass
     const newPassword = req.body.newPassword
     User.findOne({
         where: {
-        email: req.user.email
+            email: req.user.email
         }
     }).then(user => {
         bcrypt.compare(actualPassword, user.password, (err, result) => {
@@ -214,23 +214,91 @@ app.post('/passwordchange', authenticateToken, (req, res) => {
                 })
             } else {
                 try {
-                User.update({
-                    password: hash
-                }, {
-                    where: { email: user.email }
+                    User.update({
+                        password: hash
+                    }, {
+                        where: { email: user.email }
                     }).then(() => {
-                    return res.json({
-                        success: true,
-                        code: 200,
-                        message: 'New password confirmed.'
-                    })
+                        return res.json({
+                            success: true,
+                            code: 200,
+                            message: 'New password confirmed.'
+                        })
                     })
                 } catch (error) {
-                console.log(error)
+                    console.log(error)
                 }
             }
             });
         }
         });
     });
+})
+
+app.post('/searchuser', (req, res) => {
+    var id, i=0, helperVar, basic=5;
+    var findedUsers = [];
+    var moreCounter = req.body.more;
+    const fnLiveSearching = async (name) => {
+      await User.findAll({
+        where:{
+          name: { [Op.iLike]: `%${name}%` }
+        },
+      }).then(user =>{
+        if(user.length == 0 || user == null){
+          return res.json({
+            success: false,
+            code: 400,
+            message:'User not exist.'
+          })
+        }else{
+          user.forEach(element => {
+            id = element.id
+            name = element.name
+            findedUsers[i] = {"id": id, "name": name}
+            i++
+          });
+          if(findedUsers.length >= 5 && moreCounter == 1){
+            helperVar = findedUsers.slice(0,4);
+            return res.json({
+              success: true,
+              code: 200,
+              findedUsers: helperVar
+            })
+          }else if(findedUsers.length >= 5 && moreCounter >= 1){
+            moreCounter *= basic
+            if(findedUsers.length < moreCounter){
+              helperVar = findedUsers.slice(0, findedUsers.length);
+              console.log(helperVar, 'x')
+              return res.json({
+                success: true,
+                code: 200,
+                findedUsers: helperVar
+              })
+            }else{
+              return res.json({
+                success: true,
+                code: 200,
+                findedUsers: findedUsers
+              })
+            }
+          }else if(findedUsers.length < 5 ){
+            return res.json({
+              success: true,
+              code: 200,
+              findedUsers: findedUsers
+            })
+          }
+        }
+      })
+    }
+    if(req.body.name == ""){
+      return res.json({
+        success: false,
+        code: 400,
+        message:'Request cant be empty.'
+      })
+    }else{
+      fnLiveSearching(req.body.name)
+    }
 })
