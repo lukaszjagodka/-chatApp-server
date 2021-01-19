@@ -20,16 +20,79 @@ const WebSocket = require('ws');
 const server = require('http').createServer(app);
 
 const wss = new WebSocket.Server({ server: server });
+var sockets = {}
 
-wss.on('connection', function connection(ws) {
-  console.log('new client conn');
-  ws.send('welcome new client');
+function noop() {}
 
-  ws.on('message', function incoming(data) {
-    console.log('reciverd ', data)
-  
-  });
+function heartbeat() {
+  this.isAlive = true;
+}
+
+wss.on("connection", function connection(ws, req) {
+  ws.isAlive = true;
+  ws.on("pong", heartbeat);
+  console.log("new client conn " +req.socket.remoteAddress);
+  var id = req.socket.remoteAddress;
+  console.log(wss.clients.size)
+  ws.on("close",function close(ws){
+    wss.clients.forEach(function each(client) {
+      if (client == ws && client.readyState === WebSocket.CLOSED) {
+        console.log(client+" closing")
+        var json = JSON.stringify({"type":"closing"})
+        client.send(json)
+      }
+    })
+    console.log(id+' closed connection')
+    delete sockets[id]
+  })
+  ws.on("message", function incoming(data) {
+    date_ob = timer()
+    let hours = ("0" + (date_ob.getHours() + 1)).slice(-2);
+    let minutes = ("0" + (date_ob.getMinutes() + 1)).slice(-2);
+    let seconds = ("0" + (date_ob.getSeconds() + 1)).slice(-2);
+    // console.log("clients: " +Object.getOwnPropertyNames(sockets))
+    console.log(wss.clients.size +" "+ hours + ":" + minutes + ":" + seconds +" "+ id +" "+ data)
+    var halo = JSON.parse(data)
+    
+    if(halo.type == "userping"){
+      var json = JSON.stringify({"type":"userping"})
+      ws.send(json)
+    }else if(halo.type == "userevent" && halo.convName){
+      sockets[id] = {ws, data}
+    }
+    wss.clients.forEach(function each(client) {
+      if (client !== ws && client.readyState === WebSocket.OPEN) {
+        if(sockets){
+            for (const [key, value] of Object.entries(sockets)) {
+              var dataParse = JSON.parse(value.data)
+              // console.log(`${key}: ${value.ws} ${value.data}`);
+              if(halo.type == "userevent" && halo.convName){
+                if(halo.convName == dataParse.convName){
+                  var wsData = JSON.parse(value.data)
+                  //Shared canal
+                  if(halo.name != wsData.name){
+                    client.send(data)
+                  }
+                }else{
+                  console.log("differents canals - save to db")
+                }
+              }
+            }
+          }else{
+            console.log('no sockets')
+          }
+        }
+      })
+  })
 });
+
+const interval = setInterval(function ping() {
+  wss.clients.forEach(function each(ws) {
+    if (ws.isAlive === false) return ws.terminate();
+    ws.isAlive = false;
+    ws.ping(noop);
+  });
+}, 30000);
 
 server.listen(3001, () =>{
     console.log("Server working");
@@ -370,3 +433,10 @@ app.post('/searchconversation', (req, res) => {
   })
   })
 })
+
+function timer(){
+  let ts = Date.now();
+  let date_ob = new Date(ts);
+  
+  return date_ob
+}
