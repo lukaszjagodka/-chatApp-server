@@ -17,6 +17,7 @@ const Op = Sequelize.Op;
 app.use(express.json());
 
 const WebSocket = require('ws');
+const { response } = require('express');
 const server = require('http').createServer(app);
 
 const wss = new WebSocket.Server({ server: server });
@@ -34,30 +35,33 @@ wss.on("connection", function connection(ws, req) {
   console.log("new client conn " +req.socket.remoteAddress);
   var id = req.socket.remoteAddress;
   console.log(wss.clients.size)
-  ws.on("close",function close(ws){
-    wss.clients.forEach(function each(client) {
-      if (client == ws && client.readyState === WebSocket.CLOSED) {
-        console.log(client+" closing")
-        var json = JSON.stringify({"type":"closing"})
-        client.send(json)
-      }
-    })
-    console.log(id+' closed connection')
+
+  ws.on("close", (code, reason) => {
+    console.log(id+' closed connection - '+code+" "+reason)
     delete sockets[id]
   })
-  ws.on("message", function incoming(data) {
+  ws.on("error", (error) => {
+    console.log("error "+error);
+  })
+  ws.on("unexpected-response", (req, res) => {
+    console.log("unexpected "+req);
+  })
+  ws.on("upgrade", (WebSocket, request) => {
+    console.log("upgrade "+WebSocket);
+  })
+  ws.on("message", (data) => {
     date_ob = timer()
     let hours = ("0" + (date_ob.getHours() + 1)).slice(-2);
     let minutes = ("0" + (date_ob.getMinutes() + 1)).slice(-2);
     let seconds = ("0" + (date_ob.getSeconds() + 1)).slice(-2);
     // console.log("clients: " +Object.getOwnPropertyNames(sockets))
-    console.log(wss.clients.size +" "+ hours + ":" + minutes + ":" + seconds +" "+ id +" "+ data)
     var halo = JSON.parse(data)
-    
     if(halo.type == "userping"){
+      console.log(wss.clients.size +" "+ hours + ":" + minutes + ":" + seconds +" "+ id)
       var json = JSON.stringify({"type":"userping"})
       ws.send(json)
     }else if(halo.type == "userevent" && halo.convName){
+      console.log(wss.clients.size +" "+ hours + ":" + minutes + ":" + seconds +" "+ id +" "+ data)
       sockets[id] = {ws, data}
     }
     wss.clients.forEach(function each(client) {
