@@ -16,7 +16,8 @@ module.exports = (sequelize, DataTypes) => {
     authToken: DataTypes.STRING,
     token: DataTypes.STRING,
     active: DataTypes.BOOLEAN,
-    conversationId: DataTypes.ARRAY(DataTypes.INTEGER)
+    conversationId: DataTypes.ARRAY(DataTypes.INTEGER),
+    addedUsers: DataTypes.ARRAY(DataTypes.INTEGER)
   }, {
     sequelize,
     modelName: 'user',
