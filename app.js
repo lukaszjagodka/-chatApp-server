@@ -438,6 +438,20 @@ app.post('/searchconversation', (req, res) => {
   })
 })
 
+app.post('/checkcontacts', authenticateToken, (req, res) => {
+  console.log("checkcontacts")
+  User.findOne({
+    where: {
+      email: req.body.email
+    }
+  }).then(elements =>{console.log(elements.id)})
+    
+  return res.json({
+    success: true,
+    code: 200
+  })
+})
+
 function timer(){
   let ts = Date.now();
   let date_ob = new Date(ts);
