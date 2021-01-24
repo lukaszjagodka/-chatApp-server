@@ -17,7 +17,6 @@ const Op = Sequelize.Op;
 app.use(express.json());
 
 const WebSocket = require('ws');
-const { response } = require('express');
 const server = require('http').createServer(app);
 
 const wss = new WebSocket.Server({ server: server });
@@ -46,7 +45,7 @@ wss.on("connection", function connection(ws, req) {
   ws.on("unexpected-response", (req, res) => {
     console.log("unexpected "+req);
   })
-  ws.on("upgrade", (WebSocket, request) => {
+  ws.on("upgrade", (WebSocket, req) => {
     console.log("upgrade "+WebSocket);
   })
   ws.on("message", (data) => {
@@ -438,17 +437,19 @@ app.post('/searchconversation', (req, res) => {
   })
 })
 
-app.post('/checkcontacts', authenticateToken, (req, res) => {
-  console.log("checkcontacts")
-  User.findOne({
-    where: {
-      email: req.body.email
-    }
-  }).then(elements =>{console.log(elements.id)})
-    
-  return res.json({
-    success: true,
-    code: 200
+app.post('/addusertocontactlist', (req, res) => {
+  var idToSave = req.body.addedUserId;
+  var userEmail = req.body.email;
+
+  User.update({
+    addedUsers: Sequelize.fn('array_append', Sequelize.col('addedUsers'), idToSave)
+  },{
+    where: { email: userEmail }
+  }).then(x => {
+    return res.json({
+      success: true,
+      code: 200
+    })
   })
 })
 
