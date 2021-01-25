@@ -125,10 +125,8 @@ app.post('/signup', (req, res) => {
                     },{
                         fields: ['name','email','password', 'active', 'token']
                     }).then(user => {
-                        
                         return res.json({
-                            success: true,
-                            code: 200
+                            success: true
                         })
                     }).catch(err => console.log(err))
                 }catch (err) {
@@ -167,15 +165,13 @@ app.post('/login', (req, res) => {
                         });
                         return res.json({
                             success: true,
-                            code: 200,
                             jwtToken
                         })
                     } catch (err) {
-                        return res.json({
-                            success: false,
-                            code: 404,
-                            message:'Failed'
-                        })
+                      return res.status(404).json({
+                        success: false,
+                        message:'Failed.'
+                      })
                     }
                 }else{
                     return res.sendStatus(404)
@@ -209,7 +205,6 @@ app.get('/signup/:token', (req, res) => {
         where: { id: user.dataValues.id },
       }).then(() => res.json({
         success: true,
-        code: 200,
         message: 'Your account is active now. Please log in.',
       })).catch((err) => console.log(err));
     }).catch((err) => console.log(err));
@@ -239,33 +234,30 @@ app.post('/rememberpassword', (req, res) => {
                         }).then(() => 
                             res.json({
                                 success: true,
-                                code: 200,
                                 message: 'Your account is active now. Please log in.',
                             })
                         )
                         remindPass(user.dataValues.email,tempPassword)
                     }catch (err) {
-                        return res.json({
-                            success: false,
-                            code: 404, //
-                            message:'Failed'
-                        })
+                      return res.status(404).json({
+                        success: false,
+                        message:'Failed.'
+                      })
                     }
-                    }
-                      console.log(tempPassword)
+                  }
+                    // console.log(tempPassword)
                   })
               }else{
-                  return res.json({
-                      success: false,
-                      message: 'Account is not active. Check your email.',
-                  });
+                return res.status(400).json({
+                  success: false,
+                  message:'Account is not active. Check your email.'
+                })
               }
           }else{
-              return res.json({
-                  success: false,
-                  code: 404,
-                  message:'Failed'
-              })
+            return res.status(400).json({
+              success: false,
+              message:'Failed.'
+            })
           }
       }).catch((err) => console.log(err));
 })
@@ -280,32 +272,29 @@ app.post('/passwordchange', authenticateToken, (req, res) => {
     }).then(user => {
         bcrypt.compare(actualPassword, user.password, (err, result) => {
         if (err) {
-            return res.json({
+          return res.status(400).json({
             success: false,
-            code: 400,
-            message: 'Actual password is wrong.'
-            })
+            message:'Actual password is wrong.'
+          })
         } else {
             bcrypt.hash(newPassword, 10, (err, hash) => {
             if (err) {
-                return res.json({
+              return res.status(400).json({
                 success: false,
-                code: 400,
-                message: 'Problem with new password.'
-                })
+                message:'Problem with new password.'
+              })
             } else {
-                try {
-                    User.update({
-                        password: hash
-                    }, {
-                        where: { email: user.email }
-                    }).then(() => {
-                        return res.json({
-                            success: true,
-                            code: 200,
-                            message: 'New password confirmed.'
-                        })
-                    })
+              try {
+                  User.update({
+                      password: hash
+                  }, {
+                      where: { email: user.email }
+                  }).then(() => {
+                      return res.json({
+                          success: true,
+                          message: 'New password confirmed.'
+                      })
+                  })
                 } catch (error) {
                     console.log(error)
                 }
@@ -327,9 +316,8 @@ app.post('/searchuser', (req, res) => {
         },
       }).then(user =>{
         if(user.length == 0 || user == null){
-          return res.json({
+          return res.status(400).json({
             success: false,
-            code: 400,
             message:'User not exist.'
           })
         }else{
@@ -343,7 +331,6 @@ app.post('/searchuser', (req, res) => {
             helperVar = findedUsers.slice(0,4);
             return res.json({
               success: true,
-              code: 200,
               findedUsers: helperVar
             })
           }else if(findedUsers.length >= 5 && moreCounter >= 1){
@@ -353,20 +340,17 @@ app.post('/searchuser', (req, res) => {
               console.log(helperVar, 'x')
               return res.json({
                 success: true,
-                code: 200,
                 findedUsers: helperVar
               })
             }else{
               return res.json({
                 success: true,
-                code: 200,
                 findedUsers: findedUsers
               })
             }
           }else if(findedUsers.length < 5 ){
             return res.json({
               success: true,
-              code: 200,
               findedUsers: findedUsers
             })
           }
@@ -402,7 +386,6 @@ app.post('/searchconversation', (req, res) => {
       const conversationName = users.dataValues.conversationName;
         return res.json({
           success: true,
-          code: 200,
           conversationName
         })
     }else{
@@ -425,7 +408,6 @@ app.post('/searchconversation', (req, res) => {
           }).then(x => {
             return res.json({
               success: true,
-              code: 200,
               conversationName
             })
           })
@@ -447,11 +429,48 @@ app.post('/addusertocontactlist', (req, res) => {
     where: { email: userEmail }
   }).then(x => {
     return res.json({
-      success: true,
-      code: 200
+      success: true
     })
   })
 })
+
+app.post('/checkcontacts', authenticateToken, 
+  async (req, res, next) => {
+    try {
+        const foundUser = await User.findOne({
+            where: { email: req.body.email }
+        });
+
+        const { addedUsers } = foundUser;
+        console.log(addedUsers)
+        const data = await fnKurs(addedUsers);
+
+        return res.json({
+            success: true,
+            data
+        });
+    } catch (err) {
+        return next(err)
+    }
+  
+
+})
+
+const fnKurs = async (items) => {
+  let result = [];
+
+  for (const item of items) {
+    const foundUser = await User.findOne({
+      where: { id: item }
+    });
+
+    if (foundUser) {
+        const { id, name } = foundUser;
+        result.push({ id, name });
+    }
+  }
+  return Promise.all(result);
+}
 
 function timer(){
   let ts = Date.now();
