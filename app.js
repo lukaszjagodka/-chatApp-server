@@ -419,7 +419,7 @@ app.post('/searchconversation', (req, res) => {
   })
 })
 
-app.post('/addusertocontactlist', (req, res) => {
+app.post('/addusertocontactlist', authenticateToken, (req, res) => {
   var idToSave = req.body.addedUserId;
   var userEmail = req.body.email;
   var addedUArray = [];
@@ -442,20 +442,12 @@ app.post('/addusertocontactlist', (req, res) => {
   })
 })
 
-function updateColAddedUsers(idToSave, userEmail){
-  User.update({
-    addedUsers: Sequelize.fn('array_append', Sequelize.col('addedUsers'), idToSave)
-  },{
-    where: { email: userEmail }
-  })
-}
-function removeColAddedUsers(idToSave, userEmail){
-  User.update({
-    addedUsers: Sequelize.fn('array_remove', Sequelize.col('addedUsers'), idToSave)
-  },{
-    where: { email: userEmail }
-  })
-}
+app.post('/deleteuserfromcontactlist', authenticateToken, (req, res) => {
+  let userIdToDelete = req.body.userIdToDelete;
+  let userEmail = req.body.email;
+  removeColAddedUsers(userIdToDelete, userEmail);
+  console.log("delete user ")
+})
 
 app.post('/checkcontacts', authenticateToken, 
   async (req, res, next) => {
@@ -504,6 +496,22 @@ const fnKurs = async (items) => {
     }
   }
   return Promise.all(result);
+}
+
+function updateColAddedUsers(idToSave, userEmail){
+  User.update({
+    addedUsers: Sequelize.fn('array_append', Sequelize.col('addedUsers'), idToSave)
+  },{
+    where: { email: userEmail }
+  })
+}
+
+function removeColAddedUsers(idToSave, userEmail){
+  User.update({
+    addedUsers: Sequelize.fn('array_remove', Sequelize.col('addedUsers'), idToSave)
+  },{
+    where: { email: userEmail }
+  })
 }
 
 function timer(){
