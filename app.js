@@ -422,33 +422,67 @@ app.post('/searchconversation', (req, res) => {
 app.post('/addusertocontactlist', (req, res) => {
   var idToSave = req.body.addedUserId;
   var userEmail = req.body.email;
+  var addedUArray = [];
 
+  User.findOne({
+    where: { email: userEmail }
+  }).then(user => {
+    addedUArray = user.addedUsers
+    if(addedUArray == null){
+      updateColAddedUsers(idToSave, userEmail)
+    }else if(addedUArray != null){
+      var arrayIncludes = addedUArray.includes(parseInt(idToSave))
+      if(arrayIncludes){
+        removeColAddedUsers(idToSave, userEmail)
+        updateColAddedUsers(idToSave, userEmail)
+      }else if(!arrayIncludes){
+        updateColAddedUsers(idToSave, userEmail)
+      }
+    }
+  })
+})
+
+function updateColAddedUsers(idToSave, userEmail){
   User.update({
     addedUsers: Sequelize.fn('array_append', Sequelize.col('addedUsers'), idToSave)
   },{
     where: { email: userEmail }
-  }).then(x => {
-    return res.json({
-      success: true
-    })
   })
-})
+}
+function removeColAddedUsers(idToSave, userEmail){
+  User.update({
+    addedUsers: Sequelize.fn('array_remove', Sequelize.col('addedUsers'), idToSave)
+  },{
+    where: { email: userEmail }
+  })
+}
 
 app.post('/checkcontacts', authenticateToken, 
   async (req, res, next) => {
+    var i=0, findedUsers=[];
     try {
         const foundUser = await User.findOne({
             where: { email: req.body.email }
         });
 
         const { addedUsers } = foundUser;
-        console.log(addedUsers)
-        const data = await fnKurs(addedUsers);
-
-        return res.json({
-            success: true,
-            data
-        });
+        if(addedUsers == null){
+          return res.json({
+            success: true
+          })
+        }else{
+          const data = await fnKurs(addedUsers);
+          data.forEach(element => {
+            id = element.id
+            namee = element.name
+            findedUsers[i] = {"id": id, "name": namee}
+            i++
+          })
+          return res.json({
+              success: true,
+              findedUsers
+          });
+        }
     } catch (err) {
         return next(err)
     }
