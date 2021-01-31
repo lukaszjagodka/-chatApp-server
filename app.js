@@ -11,6 +11,7 @@ const createNewUuid = require('./utils/create_new_uuid');
 
 const User = require('./database/models').user;
 const conversationPermiss = require('./database/models').conversationPermiss;
+const temporaryMessages = require('./database/models').temporaryMessages;
 var Sequelize = require('sequelize');
 const Op = Sequelize.Op;
 
@@ -32,7 +33,7 @@ wss.on("connection", function connection(ws, req) {
   ws.isAlive = true;
   ws.on("pong", heartbeat);
   console.log("new client conn " +req.socket.remoteAddress);
-  var id = req.socket.remoteAddress;
+  const id = req.socket.remoteAddress;
   console.log(wss.clients.size)
 
   ws.on("close", (code, reason) => {
@@ -54,10 +55,10 @@ wss.on("connection", function connection(ws, req) {
     let minutes = ("0" + (date_ob.getMinutes() + 1)).slice(-2);
     let seconds = ("0" + (date_ob.getSeconds() + 1)).slice(-2);
     // console.log("clients: " +Object.getOwnPropertyNames(sockets))
-    var halo = JSON.parse(data)
+    let halo = JSON.parse(data)
     if(halo.type == "userping"){
       console.log(wss.clients.size +" "+ hours + ":" + minutes + ":" + seconds +" "+ id)
-      var json = JSON.stringify({"type":"userping"})
+      let json = JSON.stringify({"type":"userping"})
       ws.send(json)
     }else if(halo.type == "userevent" && halo.convName){
       console.log(wss.clients.size +" "+ hours + ":" + minutes + ":" + seconds +" "+ id +" "+ data)
@@ -67,17 +68,49 @@ wss.on("connection", function connection(ws, req) {
       if (client !== ws && client.readyState === WebSocket.OPEN) {
         if(sockets){
             for (const [key, value] of Object.entries(sockets)) {
-              var dataParse = JSON.parse(value.data)
+              let dataParse = JSON.parse(value.data)
               // console.log(`${key}: ${value.ws} ${value.data}`);
               if(halo.type == "userevent" && halo.convName){
                 if(halo.convName == dataParse.convName){
-                  var wsData = JSON.parse(value.data)
+                  let wsData = JSON.parse(value.data)
                   //Shared canal
                   if(halo.name != wsData.name){
                     client.send(data)
                   }
                 }else{
+                  let wsData = JSON.parse(value.data)
+                  let {name, convName, message} = wsData;
                   console.log("differents canals - save to db")
+                  // console.log(halo)
+                  conversationPermiss.findOne({
+                    where: { 
+                      conversationName: halo.convName
+                    }
+                  }).then(x => {
+                    let sender = x.dataValues.conversationUsers[0];
+                    let recipient = x.dataValues.conversationUsers[1];
+                    User.findOne({
+                      where: {
+                        id: sender
+                      }
+                    }).then(z => {
+                      if(z.name == halo.name){
+                        temporaryMessages.create({
+                          sender,
+                          recipient,
+                          message,
+                          conversationName: convName
+                        })
+                      }else{
+                        temporaryMessages.create({
+                          sender: recipient,
+                          recipient: sender,
+                          message: halo.message,
+                          conversationName: convName
+                        })
+                      }
+                    })
+                  })
                 }
               }
             }
@@ -431,7 +464,7 @@ app.post('/addusertocontactlist', authenticateToken, (req, res) => {
     if(addedUArray == null){
       updateColAddedUsers(idToSave, userEmail)
     }else if(addedUArray != null){
-      var arrayIncludes = addedUArray.includes(parseInt(idToSave))
+      var arrayIncludes = addedUArray.includes(+idToSave)
       if(arrayIncludes){
         removeColAddedUsers(idToSave, userEmail)
         updateColAddedUsers(idToSave, userEmail)
@@ -446,12 +479,11 @@ app.post('/deleteuserfromcontactlist', authenticateToken, (req, res) => {
   let userIdToDelete = req.body.userIdToDelete;
   let userEmail = req.body.email;
   removeColAddedUsers(userIdToDelete, userEmail);
-  console.log("delete user ")
 })
 
 app.post('/checkcontacts', authenticateToken, 
   async (req, res, next) => {
-    var i=0, findedUsers=[];
+    let i=0, findedUsers=[];
     try {
         const foundUser = await User.findOne({
             where: { email: req.body.email }
@@ -471,16 +503,84 @@ app.post('/checkcontacts', authenticateToken,
             i++
           })
           return res.json({
-              success: true,
-              findedUsers
+            success: true,
+            findedUsers
           });
         }
     } catch (err) {
         return next(err)
     }
-  
-
 })
+
+app.post('/checkMessages', authenticateToken,
+  async (req, res, next) => {
+    console.log(req.body);
+    let i=0, offlineMessages=[];
+    try {
+      const foundUser = await User.findOne({
+        where: { email: req.body.email }
+      });
+
+      const { id } = foundUser;
+      if(id == null){
+        return res.json({
+          success: true
+        })
+      }else{
+        const dataValues = await findRecipientMessages(id);
+        const receivedMessages = await findUsersName(dataValues);
+        // console.log(receivedMessages)
+        receivedMessages.forEach(element => {
+          namee = element.name
+          message = element.message
+          createdAt = element.createdAt
+          // offlineMessages[i] = {"name": namee, "message": message, "timestamp":createdAt}
+          offlineMessages[i] = {"name": namee, "message": message}
+          i++
+        })
+        console.log(offlineMessages)
+        return res.json({
+          success: true,
+          offlineMessages
+        })
+      }
+    }catch (err) {
+      return next(err)
+    }
+})
+
+const findRecipientMessages = async (id) => {
+  let result = [];
+
+    const foundOffilneMessages = await temporaryMessages.findAll({
+      where: { recipient: id }
+    });
+
+    foundOffilneMessages.forEach(element => {
+      console.log(foundOffilneMessages)
+      const { sender, message, createdAt } = element;
+        result.push({ sender, message });
+    })
+  
+  return Promise.all(result);
+}
+
+const findUsersName = async (objects) => {
+  let result = [];
+
+  for (const object of objects) {
+    let { message, createdAt } = object;
+    const foundUser = await User.findOne({
+      where: { id: object.sender }
+    });
+
+    if (foundUser) {
+        const { name } = foundUser;
+        result.push({ name, message, createdAt });
+    }
+  }
+  return Promise.all(result);
+}
 
 const fnKurs = async (items) => {
   let result = [];
