@@ -6,6 +6,9 @@ module.exports = (sequelize, DataTypes) => {
     static associate(models) {
       user.hasMany(models.conversationPermiss, {
         foreignKey: 'conversationUsers'
+      }),
+      user.hasMany(models.temporaryMessages, {
+        foreignKey: 'recipient'
       })
     }
   };
