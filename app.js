@@ -348,11 +348,11 @@ app.post('/searchuser', (req, res) => {
           name: { [Op.iLike]: `%${name}%` }
         },
       }).then(user =>{
-        if(user.length == 0 || user == null){
-          return res.status(400).json({
-            success: false,
-            message:'User not exist.'
-          })
+        if(user.length === 0 || user === null){
+            return res.json({
+              success: true,
+              findedUsers: []
+            })
         }else{
           user.forEach(element => {
             id = element.id
