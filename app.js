@@ -30,6 +30,7 @@ function heartbeat() {
 }
 
 wss.on("connection", function connection(ws, req) {
+  wsConvName = [];
   ws.isAlive = true;
   ws.on("pong", heartbeat);
   console.log("new client conn " +req.socket.remoteAddress);
@@ -50,12 +51,14 @@ wss.on("connection", function connection(ws, req) {
     console.log("upgrade "+WebSocket);
   })
   ws.on("message", (data) => {
+    let halo = JSON.parse(data)
+    // wsConvName.push(halo.convName)
     date_ob = timer()
     let hours = ("0" + (date_ob.getHours() + 1)).slice(-2);
     let minutes = ("0" + (date_ob.getMinutes() + 1)).slice(-2);
     let seconds = ("0" + (date_ob.getSeconds() + 1)).slice(-2);
     // console.log("clients: " +Object.getOwnPropertyNames(sockets))
-    let halo = JSON.parse(data)
+    
     if(halo.type == "userping"){
       console.log(wss.clients.size +" "+ hours + ":" + minutes + ":" + seconds +" "+ id)
       let json = JSON.stringify({"type":"userping"})
@@ -63,6 +66,7 @@ wss.on("connection", function connection(ws, req) {
     }else if(halo.type == "userevent" && halo.convName){
       console.log(wss.clients.size +" "+ hours + ":" + minutes + ":" + seconds +" "+ id +" "+ data)
       sockets[id] = {ws, data}
+      // console.log(wsConvName)
     }
     wss.clients.forEach(function each(client) {
       if (client !== ws && client.readyState === WebSocket.OPEN) {
@@ -71,16 +75,19 @@ wss.on("connection", function connection(ws, req) {
               let dataParse = JSON.parse(value.data)
               // console.log(`${key}: ${value.ws} ${value.data}`);
               if(halo.type == "userevent" && halo.convName){
+                // console.log("pierwsza wiadomosc")
                 if(halo.convName == dataParse.convName){
+                  console.log("piddddddsc")
                   let wsData = JSON.parse(value.data)
                   //Shared canal
                   if(halo.name != wsData.name){
+                    // console.log(wsConvName)
                     client.send(data)
                   }
                 }else{
+                  console.log("differents canals - save to db")
                   let wsData = JSON.parse(value.data)
                   let {name, convName, message} = wsData;
-                  console.log("differents canals - save to db")
                   // console.log(halo)
                   conversationPermiss.findOne({
                     where: { 
@@ -112,6 +119,8 @@ wss.on("connection", function connection(ws, req) {
                     })
                   })
                 }
+              }else{
+                console.log("last line")
               }
             }
           }else{
@@ -524,21 +533,26 @@ app.post('/checkMessages', authenticateToken,
       const { id } = foundUser;
       if(id == null){
         return res.json({
-          success: true
+          success: true,
+          offlineMessages: []
         })
       }else{
         const dataValues = await findRecipientMessages(id);
         const receivedMessages = await findUsersName(dataValues);
         // console.log(receivedMessages)
         receivedMessages.forEach(element => {
+          number = element.id
           namee = element.name
           message = element.message
+          conversationName = element.conversationName
           createdAt = element.createdAt
-          // offlineMessages[i] = {"name": namee, "message": message, "timestamp":createdAt}
-          offlineMessages[i] = {"name": namee, "message": message}
+          offlineMessages[i] = {"id": number, "name": namee, "message": message, "conversationName": conversationName, "createdAt": createdAt}
           i++
         })
         console.log(offlineMessages)
+        temporaryMessages.destroy({
+          where: { recipient: id }
+        })
         return res.json({
           success: true,
           offlineMessages
@@ -557,9 +571,9 @@ const findRecipientMessages = async (id) => {
     });
 
     foundOffilneMessages.forEach(element => {
-      console.log(foundOffilneMessages)
-      const { sender, message, createdAt } = element;
-        result.push({ sender, message });
+      // console.log(foundOffilneMessages)
+      const { sender, message, conversationName, createdAt } = element;
+        result.push({ sender, message, conversationName, createdAt });
     })
   
   return Promise.all(result);
@@ -569,14 +583,14 @@ const findUsersName = async (objects) => {
   let result = [];
 
   for (const object of objects) {
-    let { message, createdAt } = object;
+    let { message, conversationName, createdAt } = object;
     const foundUser = await User.findOne({
       where: { id: object.sender }
     });
 
     if (foundUser) {
-        const { name } = foundUser;
-        result.push({ name, message, createdAt });
+        const { id, name } = foundUser;
+        result.push({ id, name, message, conversationName, createdAt });
     }
   }
   return Promise.all(result);
